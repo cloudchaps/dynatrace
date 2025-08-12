@@ -1,0 +1,7 @@
+---
+- name: Provisioning postgresql db
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+    - role: postgres

@@ -1,0 +1,154 @@
+version: "3"
+
+env:
+  ### AWS Variables
+  
+  ### AZURE Variable
+  
+  ### GCLOUD Variables
+  GCLOUD_PROJECT_ID: "cloudchapsmainproject-458812"
+  GCLOUD_SVC_ADMIN: "Cloud-Chaps-Admin-ServiceAccount"
+  GCLOUD_SVC_ACCOUNT: "cloudchaps-SVC-storageAdmin"
+  GCLOUD_SVC_ACCOUNT_DESC: "This-service-account-is-used-to-create,-manage-and-delete-storage-services-and-buckets"
+  GCLOUD_GCS_BUCKET_NM: "gcp-cc-tfstatefiles"
+  GCLOUD_GCS_BUCKET_NM_TWO: "gcp-cc-terramodules"
+  GCP_VIEWER_USER: "delarosasaucedodanielalberto@gmail.com"
+  GCLOUD_TOPIC: "CloudChaps-Topic"
+  GCLOUD_SUBSCRIPTION: "CloudChaps-Subscription"
+tasks:
+####### GENERATE AWS S3 BUCKETS #######
+  AWS:01-create-S3-bucket:
+    desc: Create two users with S3 bucket different policies and two different S3 buckets
+    cmds: 
+      - cmd: |
+          gum style "$(cat <<EOF
+          This task perform the following steps in AWS cloud. Before running it you need to set up access keys with IAM policies:
+          🪣 1. Create Two S3 Buckets
+            - These commands create two S3 buckets in the specified AWS region. Bucket names must be globally unique.
+          🔁 2. Enable Lifecycle Rules and Versioning
+            - Versioning enables multiple versions of an object (great for backups), while lifecycle 
+              configuration defines storage transitions (e.g., to Glacier) or automatic deletions.
+          📁 3. Upload Files to the S3 Buckets
+            - This copies all files from a local directory into the specified S3 bucket. 
+          🛡️ 4. Assign a Bucket Policy from JSON File
+            - This command assigns a bucket policy from a local JSON file to control access at the bucket level 
+            — such as denying access to a specific folder or enabling access to specific users/accounts.
+
+          🚨🚨🚨 NOTE: Exposing such credentials or store them in any control version system platform is extremly risky and can lead to potential 
+          monetary charges in your cloud platform due to the credentials being used for any kind of tasks in your account.
+          (Make sure you run the task AWS:03-delete-aws-resources to delete all the resources in this task list after you finish using it.) 🚨🚨🚨
+          EOF
+          )"
+        silent: true
+      - aws s3api create-bucket --bucket ${AWS_S3_GENERAL_BUCKET_NM} --region ${AWS_S3_BUCKET_REGION} --object-ownership BucketOwnerEnforced
+      - aws s3api create-bucket --bucket ${AWS_S3_GENERAL_BUCKET_TWO} --region ${AWS_S3_BUCKET_REGION} --object-ownership BucketOwnerEnforced
+      - aws s3api put-bucket-versioning --bucket ${AWS_S3_GENERAL_BUCKET_NM} --versioning-configuration Status=Enabled
+      - aws s3api put-bucket-versioning --bucket ${AWS_S3_GENERAL_BUCKET_TWO} --versioning-configuration Status=Enabled
+      - aws s3api put-public-access-block --bucket ${AWS_S3_GENERAL_BUCKET_NM} --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+      - aws s3api put-public-access-block --bucket ${AWS_S3_GENERAL_BUCKET_TWO} --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+      - ./02-scripts/03-Generate_topic_policy.sh ${AWS_S3_GENERAL_BUCKET_NM} ${AWS_SNS_TOPIC_NM} ${AWS_S3_BUCKET_REGION}
+      - ./02-scripts/02-Subscribe_topic.sh ${AWS_SNS_TOPIC_NM} ${AWS_SNS_SUBSCRIPTION_MAIL}
+      - aws s3api put-bucket-notification-configuration --bucket ${AWS_S3_GENERAL_BUCKET_NM} --notification-configuration file://aws-delete-config.json
+      - aws s3 cp ./01-terraform/01-modules/01-AWS s3://${AWS_S3_GENERAL_BUCKET_NM}/01-AWS --recursive
+      
+  AWS:02-run-terraform-fmt-check:
+    desc: Check terraform config files format
+    cmds:
+      - cd ./01-terraform-files-AWS
+      - terraform init
+      - terraform fmt
+      - terraform validate
+      - cd ..
+  
+  AWS:03-delete-S3-resources:
+    desc: delete AWS resources created in this lecture
+    cmds:
+      - ./02-scripts/01-aws-delete-versions.sh ${AWS_S3_GENERAL_BUCKET_NM}
+      - aws s3 rb s3://${AWS_S3_GENERAL_BUCKET_NM} --force
+      - ./02-scripts/01-aws-delete-versions.sh ${AWS_S3_GENERAL_BUCKET_TWO}
+      - aws s3 rb s3://${AWS_S3_GENERAL_BUCKET_TWO} --force
+      - ./02-scripts/01-Delete_SNS.sh ${AWS_SNS_TOPIC_NM}
+      - rm -f sns-policy-s3bucket.json s3-notification-policy.json
+
+####### GENERATE AZURE BLOB STORAGE#######
+  Azure:01-create-Azure-blob-storage:
+    desc: Create a blob storage container within a custom resource group
+    cmds: 
+      - cmd: |
+          gum style "$(cat <<EOF
+          🔐 1. Login to Azure
+            - This opens a browser window where you log in with your Azure credentials.
+          👤 2. Create a Service Principal with Contributor role
+            - This service principal will be used by Terraform to interact with your Azure resources.
+          🛠️ 3. Run a bash script that sets the service principal credentials 
+            - This allows automation without logging in every time.
+          🗂️ 3. Create a Resource Group
+            - This will serve as a logical container for your Azure resources.
+          💾 4. Create Two Storage Accounts and One Container in Each
+            - An Azure Storage Account is like a digital storage unit in the cloud — 
+              it holds all your data services in one place.
+            - Think of a container like a folder inside your storage account's Blob service. 
+              It’s where you store blobs (files).
+            - Blob = Binary Large Object (e.g., images, videos, documents, code artifacts)
+          🔑 5. Get Storage Account Keys
+            - You’ll need these to access and manage the storage accounts programmatically.
+          🕒 6. Enable Versioning and Assign Lifecycle Policies
+            - Versioning enables multiple versions of an object (great for backups), while lifecycle 
+              configuration defines storage transitions (e.g., to Glacier) or automatic deletions.
+          📤 7. Upload Terraform Modules and State File
+          5. Create a group and add the users created in previous step to it
+          6. Assign users and groups in the subscription with it's own role each
+
+          🚨🚨🚨 NOTE: Exposing such credentials or store them in any control version system platform is extremly risky and can lead to potential 
+          monetary charges in your cloud platform due to the credentials being used for any kind of tasks in your subscripcion.
+          (Make sure you run the task Azure:03-delete-aws-resources to delete all the resources in this lesson after you finish using it.) 🚨🚨🚨
+          EOF
+          )"
+        silent: true
+      - az login
+      - ./02-scripts/04-Azure-Resources.sh ${AZURE_SVC_NM} ${AZURE_RESOURCE_GROUP} ${AZURE_STORAGE_ACCOUNT} ${AZURE_CONTAINER_NM} ${AZURE_CONTAINER_NM_TWO} ${APP_SERVICE_PLAN_NAME} ${AZURE_LOGIC_APP}
+      
+  Azure:02-delete-terraform-resources:
+    desc: delete terraform resources
+    cmds:
+      - cd ./01-terraform-files-AWS
+      - terraform destroy
+      - cd ..
+
+  Azure:03-delete-azure-resources:
+    desc: delete AWS resources
+    cmds:
+      - az login
+      - az ad sp list --display-name ${AZURE_SVC_NM} > sp.json
+      - az group delete --name ${AZURE_RESOURCE_GROUP} --yes
+      - az ad sp delete --id $(jq -r '.[0].id' sp.json)
+      - rm -f azure-user1-details.json servicePrincipal.json sp.json azure-storage-account-keys.txt
+
+####### SRE CONCEPTS GCLOUD COMMANDS AND TRAINING EXAMPLES #######
+
+  GCLOUD:01-SRE-Concepts-GCP:
+    desc: SRE Concepts and examples bootcamp training.
+    cmds: 
+      - cmd: |
+          gum style "$(cat <<EOF
+          1. Authorization Login 🔐
+            - Opens a browser to authenticate your Google account. This allows the CLI to make authenticated 
+              requests on your behalf.
+          2. Set Default Project 🎯
+            - This sets the project where all your following actions will take place
+
+          🚨🚨🚨 NOTE: Exposing such credentials or store them in any control version system platform is extremly risky and can lead to potential 
+          monetary charges in your cloud platform due to the credentials being used for any kind of tasks in your subscripcion.
+          (Make sure you run the task AWS:delete to delete all the resources in this lesson after you finish using it.) 🚨🚨🚨
+          EOF
+          )"
+        silent: true
+      - gcloud auth login
+      - gcloud config set project ${GCLOUD_PROJECT_ID} >> ~/tmp/gcloudlogs.md
+
+  GCLOUD:01-delete-GCP-resources:
+    desc: delete GCP Cloud resources
+    cmds:
+      - gcloud storage rm -r gs://${GCLOUD_GCS_BUCKET_NM} gs://${GCLOUD_GCS_BUCKET_NM_TWO} --impersonate-service-account=${GCLOUD_SVC_ACCOUNT}@${GCLOUD_PROJECT_ID}.iam.gserviceaccount.com >> ~/tmp/gcloudlogs.md
+      - gcloud iam service-accounts delete ${GCLOUD_SVC_ACCOUNT}@${GCLOUD_PROJECT_ID}.iam.gserviceaccount.com --impersonate-service-account=${GCLOUD_SVC_ADMIN}@${GCLOUD_PROJECT_ID}.iam.gserviceaccount.com --impersonate-service-account=${GCLOUD_SVC_ADMIN}@${GCLOUD_PROJECT_ID}.iam.gserviceaccount.com
+      - rm -f gcloudlogs.md ${GCLOUD_SVC_ACCOUNT_KEY}

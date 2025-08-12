@@ -1,0 +1,27 @@
+version: "3"
+
+env:
+  ### General Variables
+
+tasks:
+####### GENERATE AWS USER AND ROLE #######
+  AWS:01-create-AWS-user:
+    desc: Create an EC2 Instance and install PSQL Database in it
+    cmds: 
+      - cmd: |
+          gum style "$(cat <<EOF
+          ✅ Pre-requisites
+          1. Create an AWS Account
+          2. 👤 Create a user in the AWS Console 🌐 with the IAMFullAccess Policy attach and run aws configure 
+              to set up credentials 🖥️
+
+          🚨🚨🚨 NOTE: Exposing such credentials or store them in any control version system platform is extremly risky and can lead to potential 
+          monetary charges in your cloud platform due to the credentials being used for any kind of tasks in your account.
+          (Make sure you run the task delete all AWS resources used in this lecture upon use) 🚨🚨🚨
+          EOF
+          )"
+        silent: true
+      - ./01-Scripts/01-LaunchEC2Instance.sh
+      - ansible-playbook -i ./03-Ansible/inventory.yaml ./03-Ansible/db.yaml
+      - ansible-playbook -i ./03-Ansible/inventory.yaml ./03-Ansible/dynatrace.yaml
+      - ansible-playbook -i ./03-Ansible/inventory.yaml ./03-Ansible/run_queries.yaml

@@ -1,0 +1,11 @@
+all:
+  hosts:
+    psql_db:
+      ansible_host: 3.86.243.114
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: /home/darosa87/Dynatrace/02-MonitorPSQL/psql_keypair.pem
+
+  children:
+    db_servers:
+      hosts:
+        psql_db:

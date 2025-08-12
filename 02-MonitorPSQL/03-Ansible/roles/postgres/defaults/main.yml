@@ -1,0 +1,8 @@
+# General Variables
+db_name: "dynatrace"
+db_tables_path: "db/tables"
+db_user: "dynatrace"
+db_password: "admin123"
+db_user_admin: "ansible"
+db_password_admin: "ansible123"
+db_table: "employees"

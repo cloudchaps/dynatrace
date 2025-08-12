@@ -1,0 +1,116 @@
+---
+- name: Install PostgreSQL packages
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+      - acl
+    state: present
+    update_cache: true
+  tags:
+    - Install_PostgreSQL
+
+- name: Start and enable PostgreSQL service
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+  tags:
+    - Start_PostgreSQL
+
+- name: Configure PostgreSQL to listen on all addresses
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/16/main/postgresql.conf
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '*'"
+    backup: true
+  notify: restart postgresql
+  tags:
+    - Configure_Listen
+
+- name: Configure PostgreSQL authentication
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/16/main/pg_hba.conf
+    line: "host all all 0.0.0.0/0 md5"
+    backup: true
+  notify: restart postgresql
+  tags:
+    - Configure_Authentication
+
+- name: Restart PostgreSQL to apply configuration
+  ansible.builtin.service:
+    name: postgresql
+    state: restarted
+  tags:
+    - Restart_PostgreSQL
+
+- name: Set PostgreSQL admin password
+  become_user: postgres
+  postgresql_user:
+    name: postgres
+    password: "{{ db_password_admin }}"
+    encrypted: true
+  when: db_password_admin is defined
+  tags:
+    - Set_Password
+
+- name: Create database
+  become_user: postgres
+  postgresql_db:
+    name: "{{ db_name }}"
+    encoding: UTF-8
+    state: present
+  tags:
+    - Create_DB
+
+- name: Create database user
+  become_user: postgres
+  postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    db: "{{ db_name }}"
+    priv: ALL
+    encrypted: true
+    state: present
+  tags:
+    - Create_User
+
+- name: Create employees table
+  become_user: postgres
+  postgresql_query:
+    db: "{{ db_name }}"
+    query: |
+      CREATE TABLE IF NOT EXISTS {{ db_table }} (
+        employee_number BIGINT,
+        last_name VARCHAR(255),
+        first_name VARCHAR(255),
+        gender VARCHAR(10),
+        city VARCHAR(255),
+        job_title VARCHAR(255),
+        department VARCHAR(255),
+        store_location VARCHAR(255),
+        division VARCHAR(255),
+        age FLOAT,
+        length_of_service FLOAT,
+        absent_hours FLOAT,
+        business_unit VARCHAR(255)
+      )
+  tags:
+    - Create_Table
+
+- name: Copy CSV File to load database backup
+  copy:
+    src: absenteeism.csv
+    dest: /tmp/absemteeism.csv
+  tags:
+    - Copy_CSV
+
+- name: Load CSV file into PostgreSQL
+  become_user: postgres
+  postgresql_query:
+    db: "{{ db_name }}"
+    query: |
+      COPY {{ db_table }} FROM '/tmp/absemteeism.csv' DELIMITER ',' CSV HEADER;
+  tags:
+    - Load_CSV

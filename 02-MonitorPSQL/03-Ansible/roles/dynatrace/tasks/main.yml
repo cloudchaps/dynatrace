@@ -1,0 +1,49 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required dependencies
+  apt:
+    name:
+      - wget
+      - gnupg
+    state: present
+  tags:
+    - dynatrace_install_deps
+
+- name: Download Dynatrace OneAgent installer
+  ansible.builtin.get_url:
+    url: "{{ dynatrace_env_url }}/api/v1/deployment/installer/agent/unix/default/latest?arch=x86"
+    dest: /tmp/Dynatrace-OneAgent-Linux-1.319.55.20250725-104938.sh
+    mode: '0755'
+    headers:
+      Authorization: "Api-Token {{ dynatrace_paas_token }}"
+  tags:
+    - install_dynatrace
+
+- name: Run Dynatrace OneAgent installer
+  command: /bin/sh /tmp/Dynatrace-OneAgent-Linux-1.319.55.20250725-104938.sh
+  args:
+    creates: /opt/dynatrace/oneagent
+  notify: restart postgresql
+  tags:
+    - run_dynatrace
+
+- name: Download Dynatrace ActiveGate installer
+  ansible.builtin.get_url:
+    url: "{{ dynatrace_env_url }}/api/v1/deployment/installer/gateway/unix/latest?arch=x86"
+    dest: /tmp/Dynatrace-ActiveGate-Linux-1.319.55.20250725-104938.sh
+    mode: '0755'
+    headers:
+      Authorization: "Api-Token {{ dynatrace_paas_token }}"
+  tags:
+    - install_dynatrace_ActiveGate
+
+- name: Run Dynatrace ActiveGate installer
+  command: /bin/bash /tmp/Dynatrace-ActiveGate-Linux-1.319.55.20250725-104938.sh
+  args:
+    creates: /opt/dynatrace/gateway
+  tags:
+    - run_dynatrace_ActiveGate
+

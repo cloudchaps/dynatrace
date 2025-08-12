@@ -1,0 +1,105 @@
+---
+- name: run multiple queries
+  hosts: all
+  become: yes
+  tasks:
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          SELECT employee_number, 
+                 last_name, 
+                 first_name, 
+                 gender, 
+                 city, 
+                 job_title, 
+                 department, 
+                 store_location, 
+                 division, 
+                 age, 
+                 length_of_service, 
+                 absent_hours, 
+                 business_unit
+          FROM public.employees
+          LIMIT 10;
+      register: query_result
+      
+    - name: Display query results
+      debug:
+        var: query_result.query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          SELECT DISTINCT city FROM public.employees WHERE gender='M';
+      register: query_result
+      
+    - name: Display query results
+      debug:
+        var: query_result.query_result
+
+    - name: Display query results
+      debug:
+        var: query_result.query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          SELECT AVG(length_of_service) FROM public.employees WHERE gender='M' AND business_unit = 'Stores';
+      register: query_result
+      
+    - name: Display query results
+      debug:
+        var: query_result.query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          SELECT gender, job_title, AVG(length_of_service) FROM public.employees GROUP by gender, job_title LIMIT 10;
+      register: query_result
+      
+    - name: Display query results
+      debug:
+        var: query_result.query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          INSERT INTO public.employees(employee_number, lastname, name, gender, city, job_title, department, store_location, division, age, length_of_service, abset_hours, business_unit)
+          VALUES (999, 'Johnsson', 'Johan', 'M', 'Amsterdam', 'Scientist', 'R&D', 'Amsterdam', 'Science', 30, 3, 6, 'Science');
+      register: query_result
+      
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          INSERT INTO public.employees(employee_number, lastname, name, gender, city, job_title, department, store_location, division, age, length_of_service, abset_hours, business_unit)
+          VALUES (1000, 'Johnsson', 'Johan 2', 'M', 'Amsterdam', 'Scientist', 'R&D', 'Amsterdam', 'Science', 30, 3, 6, 'Science');
+      register: query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          INSERT INTO public.employees(employee_number, lastname, name, gender, city, job_title, department, store_location, division, age, length_of_service, abset_hours, business_unit)
+          VALUES (1001, 'Johnsson', 'Johan 3', 'M', 'Amsterdam', 'Scientist', 'R&D', 'Amsterdam', 'Science', 30, 3, 6, 'Science');
+      register: query_result
+
+    - name: Select Query
+      become_user: postgres
+      postgresql_query:
+        db: dynatrace
+        query: |
+          delete from public.employees where name='Janet';
+      register: query_result
